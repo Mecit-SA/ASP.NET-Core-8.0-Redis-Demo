@@ -1,42 +1,46 @@
+using Microsoft.Extensions.Caching.Distributed;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddStackExchangeRedisCache(action => {
+    var connection = builder.Configuration["RedisConnection"];
+    action.Configuration = connection;
+});
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-var summaries = new[]
+app.MapGet("/count", async (IDistributedCache cache) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var value = await cache.GetStringAsync("count");
+    if (string.IsNullOrWhiteSpace(value))
+        return 0;
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    return int.Parse(value);
 })
-.WithName("GetWeatherForecast")
+.WithName("Get Count")
+.WithOpenApi();
+
+app.MapPut("/increase", async (IDistributedCache cache) =>
+{
+    var value = await cache.GetStringAsync("count");
+
+    var nextValue = string.IsNullOrWhiteSpace(value) ?
+                    1.ToString() :
+                    (int.Parse(value) + 1).ToString();
+
+    cache.SetString("count", nextValue);
+    return Results.Ok();
+})
+.WithName("Increase Count")
 .WithOpenApi();
 
 app.Run();
-
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
