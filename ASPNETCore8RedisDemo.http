@@ -1,0 +1,6 @@
+@ASPNETCore8RedisDemo_HostAddress = http://localhost:5073
+
+GET {{ASPNETCore8RedisDemo_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
